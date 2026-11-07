@@ -1,4 +1,5 @@
 //! Totals for the current 5-hour window and today, plus the tooltip text.
+use crate::clock::clock;
 use crate::model::{Entry, ModelRow, Period, Snapshot, Tokens};
 use chrono::{DateTime, Local, NaiveDate, TimeZone};
 use std::collections::HashMap;
@@ -107,7 +108,7 @@ pub fn tooltip(s: &Snapshot) -> String {
                 "5h {} · {} tok · resets {}",
                 spent(&s.window),
                 tokens(s.window.tokens),
-                end.format("%H:%M")
+                clock(end)
             ),
             None => "No active 5h window".to_string(),
         };

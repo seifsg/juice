@@ -41,6 +41,7 @@ impl Drop for Frame {
     }
 }
 
+/// UTF-16 for the W-suffixed GDI calls.
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }

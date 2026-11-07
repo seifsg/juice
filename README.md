@@ -2,7 +2,7 @@
 
 A Windows taskbar meter that shows the tokens and estimated cost of your Claude Code sessions, for the current 5-hour window and today.
 
-![Juice on the taskbar: $8.96, 5h · resets 17:00](site/taskbar.png)
+![Juice on the taskbar: $9.57, 5h · resets 17:00](site/taskbar.png)
 
 ![Juice flyout over the Windows tray](site/flyout.png)
 
@@ -34,7 +34,7 @@ Running it twice just opens the flyout of the copy already running.
 
 ## Build from source
 
-Needs Node 24+, Rust (stable) and Windows 10/11 with WebView2 (built in on Windows 11).
+Needs Node 24+, Rust (stable) and Windows 11. Windows 10 should work too (with WebView2 installed, and a solid flyout instead of the Mica backdrop) but is untested.
 
 ```bash
 npm ci

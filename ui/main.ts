@@ -18,14 +18,30 @@ const show = (s: Snapshot | null): void => {
   view.render(s, Date.now());
 };
 
+/** Reads both switches from the system, so a change made elsewhere (Task Manager) shows on every open. */
+const syncSwitches = async (): Promise<void> => {
+  view.setSwitches(await invoke<boolean>('autostart'), await invoke<boolean>('badge'));
+};
+
 // The window hugs its content; the core places it over the tray icon.
 new ResizeObserver(() => {
   invoke('fit', { height: Math.ceil(root.getBoundingClientRect().height) }).catch((e: unknown) => console.error('juice: fit', e));
 }).observe(root);
 
-await listen<Snapshot>('snapshot', (e) => show(e.payload));
-show(await invoke<Snapshot | null>('snapshot'));
-view.setSwitches(await invoke<boolean>('autostart'), await invoke<boolean>('badge'));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') invoke('close').catch((err: unknown) => console.error('juice: close', err));
+});
+
+try {
+  await listen<Snapshot>('snapshot', (e) => show(e.payload));
+  // An event may already have arrived: keep it rather than the older first-paint copy.
+  const first = await invoke<Snapshot | null>('snapshot');
+  if (!last) show(first);
+  await syncSwitches();
+} catch (e) {
+  console.error('juice: start', e);
+  show(last);
+}
 view.enter();
 
 // Countdown and time bar move on their own, only while the flyout is visible.
@@ -34,4 +50,5 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   view.render(last, Date.now());
   view.enter();
+  syncSwitches().catch((e: unknown) => console.error('juice: switches', e));
 });

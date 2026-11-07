@@ -9,6 +9,7 @@ pub fn badge_on(dir: &Path) -> bool {
     !dir.join(BADGE_OFF).exists()
 }
 
+/// Remembers the choice: on removes the marker, off writes it.
 pub fn set_badge(dir: &Path, on: bool) -> io::Result<()> {
     let marker = dir.join(BADGE_OFF);
     if on {

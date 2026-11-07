@@ -49,12 +49,13 @@ fn arm(root: &Path, tx: &Sender<Msg>) -> (Option<RecommendedWatcher>, bool) {
     match notify::recommended_watcher(handler).and_then(|mut w| w.watch(target, mode).map(|()| w)) {
         Ok(w) => (Some(w), found),
         Err(e) => {
-            eprintln!("juice: cannot watch {}: {e}", target.display());
+            crate::log::warn(format_args!("cannot watch {}: {e}", target.display()));
             (None, found)
         }
     }
 }
 
+/// The worker loop: wait for an event or the next timed wake, read what changed, publish the new snapshot.
 fn run(root: &Path, rx: &Receiver<Msg>, tx: &Sender<Msg>, publish: &dyn Fn(Snapshot)) {
     let mut store = Store::new(root.to_path_buf());
     let (mut watcher, mut covers_root) = arm(root, tx);

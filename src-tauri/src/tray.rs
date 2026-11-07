@@ -2,6 +2,7 @@
 use crate::model::Snapshot;
 use crate::place::{place, Area};
 use crate::worker::Msg;
+use crate::log::warn;
 use crate::{agg, badge, icon};
 use std::sync::mpsc::Sender;
 use std::sync::{Mutex, PoisonError};
@@ -81,15 +82,15 @@ pub fn publish<R: Runtime>(app: &AppHandle<R>, snap: Snapshot) {
             .set_icon(Some(icon::tile(snap.window.cost, snap.window_end.is_some())))
             .and_then(|()| tray.set_tooltip(Some(agg::tooltip(&snap))));
         if let Err(e) = shown {
-            eprintln!("juice: tray update failed: {e}");
+            warn(format_args!("tray update failed: {e}"));
         }
     }
     let lines = badge::lines(&snap);
     if let Err(e) = app.run_on_main_thread(move || badge::update(lines)) {
-        eprintln!("juice: badge update failed: {e}");
+        warn(format_args!("badge update failed: {e}"));
     }
     if let Err(e) = app.emit_to(FLYOUT, "snapshot", &snap) {
-        eprintln!("juice: flyout update failed: {e}");
+        warn(format_args!("flyout update failed: {e}"));
     }
 }
 
@@ -122,22 +123,26 @@ pub fn show<R: Runtime>(app: &AppHandle<R>) {
             }
             tick(app);
             if let Err(e) = w.show().and_then(|()| w.set_focus()) {
-                eprintln!("juice: flyout show failed: {e}");
+                warn(format_args!("flyout show failed: {e}"));
             }
         }
-        Err(e) => eprintln!("juice: flyout failed: {e}"),
+        Err(e) => warn(format_args!("flyout failed: {e}")),
     }
 }
 
 /// Hides the flyout, then frees its webview unless it is shown again within `RELEASE_AFTER`.
 fn hide<R: Runtime>(app: &AppHandle<R>, w: &WebviewWindow<R>) {
-    let _ = w.hide();
+    if let Err(e) = w.hide() {
+        warn(format_args!("flyout hide failed: {e}"));
+    }
     let (app, w) = (app.clone(), w.clone());
     std::thread::spawn(move || {
         std::thread::sleep(RELEASE_AFTER);
         let shown_since = app.state::<Moments>().0.lock().is_ok_and(|m| within(m.0, RELEASE_AFTER));
         if !shown_since && !w.is_visible().unwrap_or(true) {
-            let _ = w.destroy();
+            if let Err(e) = w.destroy() {
+                warn(format_args!("flyout release failed: {e}"));
+            }
         }
     });
 }
@@ -147,7 +152,7 @@ fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
     if let Some(w) = app.get_webview_window(FLYOUT) {
         return Ok(w);
     }
-    let w = WebviewWindowBuilder::new(app, FLYOUT, WebviewUrl::App("index.html".into()))
+    let builder = WebviewWindowBuilder::new(app, FLYOUT, WebviewUrl::App("index.html".into()))
         .title("Juice")
         .inner_size(WIDTH, 360.0)
         .decorations(false)
@@ -155,10 +160,14 @@ fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
         .skip_taskbar(true)
         .always_on_top(true)
         .visible(false)
-        .transparent(true)
-        .shadow(true)
-        .effects(WindowEffectsConfig { effects: vec![Effect::Mica], ..Default::default() })
-        .build()?;
+        .shadow(true);
+    // Mica needs Windows 11; elsewhere the page paints a solid background instead of a see-through window.
+    let w = if mica() {
+        builder.transparent(true).effects(WindowEffectsConfig { effects: vec![Effect::Mica], ..Default::default() })
+    } else {
+        builder.initialization_script("document.documentElement.classList.add('solid')")
+    }
+    .build()?;
     let handle = app.clone();
     let win = w.clone();
     w.on_window_event(move |e| {
@@ -180,6 +189,22 @@ fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
     });
     fit_to(app, &w, 360.0)?;
     Ok(w)
+}
+
+/// Whether this Windows draws the Mica backdrop (Windows 11, build 22000 and later).
+fn mica() -> bool {
+    #[cfg(windows)]
+    return windows_version::OsVersion::current().build >= 22_000;
+    #[cfg(not(windows))]
+    false
+}
+
+/// Escape in the flyout: hide it like a click elsewhere would.
+#[tauri::command]
+pub fn close<R: Runtime>(app: AppHandle<R>) {
+    if let Some(w) = app.get_webview_window(FLYOUT) {
+        hide(&app, &w);
+    }
 }
 
 /// Resizes the flyout to `height` CSS pixels and places it over the tray icon.

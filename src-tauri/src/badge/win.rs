@@ -107,7 +107,7 @@ fn attach() {
         (taskbar, notify, badge, hook)
     };
     if badge.is_null() {
-        eprintln!("juice: taskbar badge window failed");
+        crate::log::warn("taskbar badge window failed");
     }
     with(|s| (s.taskbar, s.notify, s.badge, s.hook) = (taskbar, notify, badge, hook));
     paint();
@@ -141,6 +141,7 @@ fn dark_taskbar() -> bool {
     !(found && light == 1)
 }
 
+/// Screen rectangle of a window.
 fn rect(h: HWND) -> RECT {
     let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
     // SAFETY: writes into `r`; a stale handle leaves it zeroed.
@@ -179,6 +180,7 @@ unsafe extern "system" fn moved(_: HWINEVENTHOOK, _: u32, hwnd: HWND, object: i3
     }
 }
 
+/// Window procedure of both windows: TaskbarCreated and theme changes (host), clicks and hover (badge).
 unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     let is_badge = with(|s| s.badge == hwnd && !hwnd.is_null());
     match msg {

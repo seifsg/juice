@@ -2,21 +2,34 @@
 use crate::{badge, settings};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, Runtime};
-use tauri_plugin_autostart::ManagerExt;
 
-/// Whether Juice starts with Windows (HKCU Run entry `Juice`).
+#[cfg(windows)]
+use crate::autostart;
+/// Starting at sign-in is Windows-only for now.
+#[cfg(not(windows))]
+mod autostart {
+    pub fn enabled() -> bool {
+        false
+    }
+    pub fn set(_on: bool) -> std::io::Result<()> {
+        Err(std::io::ErrorKind::Unsupported.into())
+    }
+}
+
+/// Whether Juice starts with Windows.
 #[tauri::command]
-pub fn autostart<R: Runtime>(app: AppHandle<R>) -> Result<bool, String> {
-    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+pub fn autostart() -> bool {
+    autostart::enabled()
 }
 
 /// Adds or removes the Run entry; returns the state Windows now reports.
 #[tauri::command]
-pub fn set_autostart<R: Runtime>(app: AppHandle<R>, on: bool) -> Result<bool, String> {
-    let a = app.autolaunch();
-    if on { a.enable() } else { a.disable() }.and_then(|()| a.is_enabled()).map_err(|e| e.to_string())
+pub fn set_autostart(on: bool) -> Result<bool, String> {
+    autostart::set(on).map_err(|e| e.to_string())?;
+    Ok(autostart::enabled())
 }
 
+/// Juice's settings and log folder.
 fn config_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     app.path().app_config_dir().map_err(|e| e.to_string())
 }
@@ -35,6 +48,7 @@ pub fn set_badge<R: Runtime>(app: AppHandle<R>, on: bool) -> Result<bool, String
     Ok(on)
 }
 
+/// Quits Juice: tray icon, badge and flyout.
 #[tauri::command]
 pub fn quit<R: Runtime>(app: AppHandle<R>) {
     app.exit(0);

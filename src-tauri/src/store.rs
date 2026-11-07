@@ -40,6 +40,7 @@ impl Ledger {
         }
     }
 
+    /// Forgets entries and keys older than `oldest`.
     fn prune(&mut self, oldest: i64) {
         self.entries.retain(|e| e.ts >= oldest);
         self.keys.retain(|_, ts| *ts >= oldest);
@@ -55,6 +56,7 @@ pub struct Store {
 }
 
 impl Store {
+    /// An empty store; `walk` fills it.
     pub fn new(root: PathBuf) -> Self {
         Store { root, files: HashMap::new(), ledger: Ledger::default() }
     }
@@ -94,6 +96,7 @@ impl Store {
         self.read(now.timestamp_millis() - HORIZON);
     }
 
+    /// Whether the logs folder exists right now.
     pub fn root_found(&self) -> bool {
         self.root.is_dir()
     }
@@ -130,12 +133,13 @@ fn keep(read: io::Result<()>, path: &Path) -> bool {
         Ok(()) => true,
         Err(e) if e.kind() == io::ErrorKind::NotFound => false,
         Err(e) => {
-            eprintln!("juice: cannot read {}: {e}", path.display());
+            crate::log::warn(format_args!("cannot read {}: {e}", path.display()));
             true
         }
     }
 }
 
+/// Claude Code session logs are `.jsonl` files.
 fn is_log(p: &Path) -> bool {
     p.extension().is_some_and(|e| e == "jsonl")
 }
@@ -193,7 +197,8 @@ mod tests {
     #[test]
     fn store_tails_dedupes_and_rereads() {
         let root = std::env::temp_dir().join(format!("juice-store-{}", std::process::id()));
-        let sub = root.join("proj").join("session").join("subagents");
+        // Over 260 characters: opening it needs Windows long-path handling.
+        let sub = root.join("proj").join("s".repeat(150)).join("a".repeat(120)).join("subagents");
         fs::create_dir_all(&sub).unwrap();
         let now = Local::now();
         let ts = (now - chrono::Duration::minutes(5)).to_rfc3339();

@@ -4,6 +4,6 @@ const download = document.querySelector<HTMLAnchorElement>('#download');
 const windows = /Windows/i.test(navigator.userAgent);
 
 if (platform && download && !windows) {
-  platform.textContent = 'Juice runs on Windows 10 and 11. Open this page there to download.';
+  platform.textContent = 'Juice runs on Windows 11. Open this page there to download.';
   download.classList.remove('primary');
 }
