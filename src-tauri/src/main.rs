@@ -1,6 +1,7 @@
 //! Juice: tray meter for local Claude Code token usage and estimated cost (unofficial).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod agg;
 mod icon;
 mod model;
 mod parse;
