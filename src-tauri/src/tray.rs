@@ -1,13 +1,17 @@
-//! Tray icon and flyout window: routes clicks to the flyout, sizes and places it.
+//! Tray icon and flyout window: shows each snapshot, routes clicks to the flyout, sizes and places it.
+use crate::model::Snapshot;
 use crate::place::{place, Area};
-use std::sync::Mutex;
+use crate::worker::Msg;
+use crate::{agg, icon};
+use std::sync::mpsc::Sender;
+use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 use tauri::image::Image;
 use tauri::tray::{MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::utils::config::WindowEffectsConfig;
 use tauri::window::Effect;
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewUrl, WebviewWindow,
+    AppHandle, Emitter, Manager, State, PhysicalPosition, PhysicalSize, Runtime, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
@@ -26,24 +30,66 @@ const SHOW_GUARD: Duration = Duration::from_millis(600);
 #[derive(Default)]
 pub struct Moments(Mutex<(Option<Instant>, Option<Instant>)>);
 
+/// Last published snapshot: the flyout's first paint, and identical ones skip the redraw.
+#[derive(Default)]
+pub struct Latest(Mutex<Option<Snapshot>>);
+
 /// True when `t` happened less than `guard` ago.
 fn within(t: Option<Instant>, guard: Duration) -> bool {
     t.is_some_and(|t| t.elapsed() < guard)
 }
 
-/// Creates the tray icon; any click toggles the flyout.
+/// Creates the tray icon; any click toggles the flyout, hovering refreshes the numbers.
 pub fn create<R: Runtime>(app: &AppHandle<R>, icon: Image<'_>) -> tauri::Result<TrayIcon<R>> {
     app.manage(Moments::default());
+    app.manage(Latest::default());
     TrayIconBuilder::with_id(TRAY)
         .icon(icon)
         .tooltip("Juice")
         .show_menu_on_left_click(false)
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = event {
-                toggle(tray.app_handle());
-            }
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } => toggle(tray.app_handle()),
+            TrayIconEvent::Enter { .. } => tick(tray.app_handle()),
+            _ => {}
         })
         .build(app)
+}
+
+/// Asks the worker to recompute: a hover or open after sleep never shows a stale window.
+fn tick<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(tx) = app.try_state::<Sender<Msg>>() {
+        let _ = tx.send(Msg::Tick);
+    }
+}
+
+/// Shows a new snapshot on the tray icon, its tooltip and the flyout. Called from the worker thread.
+pub fn publish<R: Runtime>(app: &AppHandle<R>, snap: Snapshot) {
+    {
+        // Released before touching the tray: tray calls wait on the main thread, which may want this lock.
+        let latest = app.state::<Latest>();
+        let mut last = latest.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if last.as_ref() == Some(&snap) {
+            return;
+        }
+        *last = Some(snap.clone());
+    }
+    if let Some(tray) = app.tray_by_id(TRAY) {
+        let shown = tray
+            .set_icon(Some(icon::tile(snap.window.cost, snap.window_end.is_some())))
+            .and_then(|()| tray.set_tooltip(Some(agg::tooltip(&snap))));
+        if let Err(e) = shown {
+            eprintln!("juice: tray update failed: {e}");
+        }
+    }
+    if let Err(e) = app.emit_to(FLYOUT, "snapshot", &snap) {
+        eprintln!("juice: flyout update failed: {e}");
+    }
+}
+
+/// The flyout's first paint; later ones arrive as `snapshot` events.
+#[tauri::command]
+pub fn snapshot(latest: State<'_, Latest>) -> Option<Snapshot> {
+    latest.0.lock().unwrap_or_else(PoisonError::into_inner).clone()
 }
 
 /// Shows the flyout, or hides it when it is open.
@@ -67,6 +113,7 @@ pub fn show<R: Runtime>(app: &AppHandle<R>) {
             if let Ok(mut m) = app.state::<Moments>().0.lock() {
                 m.0 = Some(Instant::now());
             }
+            tick(app);
             let _ = w.show().and_then(|_| w.set_focus());
         }
         Err(e) => eprintln!("juice: flyout failed: {e}"),
