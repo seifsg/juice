@@ -1,5 +1,6 @@
 //! The badge window: a layered child of the taskbar (`Shell_TrayWnd`) placed left of the notification area
-//! (`TrayNotifyWnd`). Child windows move, hide and auto-hide with the taskbar for free. Main thread only.
+//! (`TrayNotifyWnd`). Child windows move, hide and auto-hide with the taskbar for free. A hidden host window
+//! hears explorer restarts, theme changes, resume from sleep and clock changes. Main thread only.
 use super::paint::{frame, Style};
 use super::Lines;
 use std::cell::RefCell;
@@ -18,7 +19,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, FindWindowExW, FindWindowW, GetWindowRect,
     GetWindowThreadProcessId, LoadCursorW, RegisterClassW, RegisterWindowMessageW, SetWindowPos, UpdateLayeredWindow,
     EVENT_OBJECT_LOCATIONCHANGE, HWND_TOP, IDC_ARROW, OBJID_WINDOW, SWP_NOACTIVATE, ULW_ALPHA, WINEVENT_OUTOFCONTEXT,
-    WM_DESTROY, WM_LBUTTONUP, WM_MOUSEMOVE, WM_SETTINGCHANGE, WNDCLASSW, WS_CHILD, WS_EX_LAYERED,
+    PBT_APMRESUMEAUTOMATIC, WM_DESTROY, WM_LBUTTONUP, WM_MOUSEMOVE, WM_POWERBROADCAST, WM_SETTINGCHANGE,
+    WM_TIMECHANGE, WNDCLASSW, WS_CHILD, WS_EX_LAYERED,
     WS_POPUP, WS_VISIBLE,
 };
 
@@ -34,6 +36,8 @@ static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 #[derive(Default)]
 struct State {
     on_click: Option<Rc<dyn Fn()>>,
+    /// Resume from sleep or a clock change: timed waits are off, so the numbers must be recomputed.
+    on_wake: Option<Rc<dyn Fn()>>,
     lines: Option<Lines>,
     enabled: bool,
     hover: bool,
@@ -55,7 +59,7 @@ fn with<T>(f: impl FnOnce(&mut State) -> T) -> T {
 }
 
 /// Registers the window class and the hidden host window; shows the badge when `enabled`.
-pub fn init(on_click: impl Fn() + 'static, enabled: bool) {
+pub fn init(on_click: impl Fn() + 'static, on_wake: impl Fn() + 'static, enabled: bool) {
     // SAFETY: class and window creation with static, NUL-terminated names on the thread that pumps messages.
     let host = unsafe {
         TASKBAR_CREATED.store(RegisterWindowMessageW(w!("TaskbarCreated")), Ordering::Relaxed);
@@ -70,7 +74,11 @@ pub fn init(on_click: impl Fn() + 'static, enabled: bool) {
         RegisterClassW(&class);
         CreateWindowExW(0, CLASS, w!("Juice"), WS_POPUP, 0, 0, 0, 0, null_mut(), null_mut(), hinstance, null())
     };
-    with(|s| (s.on_click, s.host) = (Some(Rc::new(on_click) as Rc<dyn Fn()>), host));
+    with(|s| {
+        s.on_click = Some(Rc::new(on_click));
+        s.on_wake = Some(Rc::new(on_wake));
+        s.host = host;
+    });
     enable(enabled);
 }
 
@@ -180,6 +188,13 @@ unsafe extern "system" fn moved(_: HWINEVENTHOOK, _: u32, hwnd: HWND, object: i3
     }
 }
 
+/// Asks for fresh numbers after the machine woke or the clock moved.
+fn wake() {
+    if let Some(f) = with(|s| s.on_wake.clone()) {
+        f();
+    }
+}
+
 /// Window procedure of both windows: TaskbarCreated and theme changes (host), clicks and hover (badge).
 unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     let is_badge = with(|s| s.badge == hwnd && !hwnd.is_null());
@@ -187,6 +202,8 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         // Explorer restarted: the old badge died with the old taskbar.
         m if m == TASKBAR_CREATED.load(Ordering::Relaxed) && m != 0 => enable(with(|s| s.enabled)),
         WM_SETTINGCHANGE => paint(),
+        WM_TIMECHANGE => wake(),
+        WM_POWERBROADCAST if wp == PBT_APMRESUMEAUTOMATIC as usize => wake(),
         WM_LBUTTONUP if is_badge => {
             if let Some(f) = with(|s| s.on_click.clone()) {
                 f();

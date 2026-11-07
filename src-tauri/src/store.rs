@@ -62,7 +62,12 @@ impl Store {
     }
 
     /// Full rescan: tracks every `.jsonl` written within the horizon, forgets older ones, reads new bytes.
+    /// A missing logs folder clears everything, so no numbers outlive the logs they came from.
     pub fn walk(&mut self, now: DateTime<Local>) {
+        if !self.root_found() {
+            (self.files, self.ledger) = (HashMap::new(), Ledger::default());
+            return;
+        }
         let oldest = now.timestamp_millis() - HORIZON;
         let since = SystemTime::UNIX_EPOCH + Duration::from_millis(oldest.max(0) as u64);
         let mut fresh = Vec::new();
@@ -205,20 +210,20 @@ mod tests {
         let a = root.join("proj").join("a.jsonl");
         // Complete line, duplicate of it, then a half-written line.
         fs::write(&a, line("m1", &ts) + &line("m1", &ts) + &line("m2", &ts)[..20]).unwrap();
-        fs::write(sub.join("agent-1.jsonl"), line("m1", &ts)).unwrap();
+        fs::write(sub.join("agent-1.jsonl"), line("m1", &ts) + &line("m4", &ts)).unwrap();
         let mut s = Store::new(root.clone());
         s.walk(now);
-        assert_eq!(s.snapshot(now).0.window.tokens, 110, "m1 counted once across files");
+        assert_eq!(s.snapshot(now).0.window.tokens, 220, "m1 once across files, m4 read from the long path");
         // The writer finishes the partial line.
         let mut f = fs::OpenOptions::new().append(true).open(&a).unwrap();
         f.write_all(&line("m2", &ts).as_bytes()[20..]).unwrap();
         s.touch(vec![a.clone()], now);
-        assert_eq!(s.snapshot(now).0.window.tokens, 220);
+        assert_eq!(s.snapshot(now).0.window.tokens, 330);
         // Replaced by a shorter file: reread from the start, old keys still dedupe.
         fs::write(&a, line("m3", &ts)).unwrap();
         s.refresh(now);
         let (snap, _) = s.snapshot(now);
-        assert_eq!((snap.window.tokens, snap.unreadable), (330, 0));
+        assert_eq!((snap.window.tokens, snap.unreadable), (440, 0));
         fs::remove_dir_all(&root).unwrap();
     }
 

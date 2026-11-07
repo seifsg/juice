@@ -47,8 +47,8 @@ view.enter();
 
 // Countdown and time bar move on their own, only while the flyout is visible.
 setInterval(() => document.hidden || view.render(last, Date.now()), 30_000);
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
+// Every open focuses the window: fresh numbers, the open motion, and switches re-read from the system.
+window.addEventListener('focus', () => {
   view.render(last, Date.now());
   view.enter();
   syncSwitches().catch((e: unknown) => report('switches', e));

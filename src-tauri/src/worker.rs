@@ -142,7 +142,8 @@ mod tests {
         assert!(wait_for(&rx, 5, |s| !s.root_found), "root removal not seen");
         fs::create_dir_all(root.join("q")).unwrap();
         fs::write(root.join("q").join("t.jsonl"), line.replace("m1", "m2")).unwrap();
-        assert!(wait_for(&rx, 5, |s| s.root_found && s.window.tokens == 20), "recreated root not followed");
+        // The deleted folder took m1 with it: only the recreated file's line counts.
+        assert!(wait_for(&rx, 5, |s| s.root_found && s.window.tokens == 10), "recreated root not followed");
         fs::remove_dir_all(&base).unwrap();
     }
 }

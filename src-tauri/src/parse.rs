@@ -19,16 +19,21 @@ struct Message {
     usage: Option<Usage>,
 }
 
+/// A token count that may be missing or `null` in the log; both mean zero.
+fn count<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+    Ok(Option::<u64>::deserialize(d)?.unwrap_or(0))
+}
+
 /// The `message.usage` object of an assistant response.
 #[derive(Debug, Default, Deserialize)]
 pub struct Usage {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "count")]
     pub input_tokens: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "count")]
     pub output_tokens: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "count")]
     pub cache_creation_input_tokens: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "count")]
     pub cache_read_input_tokens: u64,
     pub cache_creation: Option<CacheCreation>,
     pub speed: Option<String>,
@@ -38,7 +43,7 @@ pub struct Usage {
 /// Split of cache writes by lifetime (1h writes cost more).
 #[derive(Debug, Default, Deserialize)]
 pub struct CacheCreation {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "count")]
     pub ephemeral_1h_input_tokens: u64,
 }
 
@@ -101,5 +106,8 @@ mod tests {
         assert!(matches!(parse_line(LINE.replace("claude-opus-5-5", "<synthetic>").as_bytes()), Parsed::Skip));
         assert!(matches!(parse_line(br#"{"message":{"usage":{"input_tokens":"many"}}}"#), Parsed::Bad));
         assert!(matches!(parse_line(br#"{"message":{"usage":{"#), Parsed::Bad));
+        let nulls = LINE.replace(r#""cache_read_input_tokens":5000"#, r#""cache_read_input_tokens":null"#);
+        let Parsed::Usage { entry, .. } = parse_line(nulls.as_bytes()) else { panic!("null count made the line unreadable") };
+        assert_eq!(entry.tok.cache_read, 0);
     }
 }

@@ -48,9 +48,9 @@ fn main() {
         .setup(|app| {
             log::init(app.path().app_config_dir()?);
             tray::create(app.handle(), icon::loading())?;
-            let handle = app.handle().clone();
+            let (clicked, woke) = (app.handle().clone(), app.handle().clone());
             let on = settings::badge_on(&app.path().app_config_dir()?);
-            badge::init(move || tray::toggle(&handle), on);
+            badge::init(move || tray::toggle(&clicked), move || tray::tick(&woke), on);
             let handle = app.handle().clone();
             let tx = worker::spawn(logs_root(app.path().home_dir())?, move |s| tray::publish(&handle, s));
             app.manage(tx);

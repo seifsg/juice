@@ -15,6 +15,7 @@ const NAME: PCWSTR = w!("Juice");
 /// StartupApproved value meaning "enabled" (an odd first byte means Task Manager disabled it).
 const APPROVED_ON: [u8; 12] = [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
+/// A Win32 status code as an `io::Result`.
 fn check(code: WIN32_ERROR) -> io::Result<()> {
     if code == 0 { Ok(()) } else { Err(io::Error::from_raw_os_error(code as i32)) }
 }

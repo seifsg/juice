@@ -12,7 +12,7 @@ pub use win::{enable, init, update};
 
 /// No taskbar badge outside Windows.
 #[cfg(not(windows))]
-pub fn init(_on_click: impl Fn() + 'static, _enabled: bool) {}
+pub fn init(_on_click: impl Fn() + 'static, _on_wake: impl Fn() + 'static, _enabled: bool) {}
 /// No taskbar badge outside Windows.
 #[cfg(not(windows))]
 pub fn enable(_on: bool) {}

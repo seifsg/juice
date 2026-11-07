@@ -60,7 +60,7 @@ pub fn create<R: Runtime>(app: &AppHandle<R>, icon: Image<'_>) -> tauri::Result<
 }
 
 /// Asks the worker to recompute: a hover or open after sleep never shows a stale window.
-fn tick<R: Runtime>(app: &AppHandle<R>) {
+pub fn tick<R: Runtime>(app: &AppHandle<R>) {
     if let Some(tx) = app.try_state::<Sender<Msg>>() {
         let _ = tx.send(Msg::Tick);
     }
