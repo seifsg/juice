@@ -1,0 +1,142 @@
+//! Tray icon and flyout window: routes clicks to the flyout, sizes and places it.
+use crate::place::{place, Area};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tauri::image::Image;
+use tauri::tray::{MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+use tauri::utils::config::WindowEffectsConfig;
+use tauri::window::Effect;
+use tauri::{
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
+};
+
+pub const TRAY: &str = "juice";
+const FLYOUT: &str = "flyout";
+/// Flyout width in CSS pixels; height comes from the page via `fit`.
+const WIDTH: f64 = 340.0;
+/// Gap between flyout and taskbar, CSS pixels.
+const GAP: f64 = 12.0;
+/// A click right after a blur-hide is the same click that caused it: don't reopen.
+const REOPEN_GUARD: Duration = Duration::from_millis(300);
+/// The shell's overflow panel takes focus back as it closes; a blur this soon after showing is not the user leaving.
+const SHOW_GUARD: Duration = Duration::from_millis(600);
+
+/// When the flyout was last shown and last hidden on blur.
+#[derive(Default)]
+pub struct Moments(Mutex<(Option<Instant>, Option<Instant>)>);
+
+/// True when `t` happened less than `guard` ago.
+fn within(t: Option<Instant>, guard: Duration) -> bool {
+    t.is_some_and(|t| t.elapsed() < guard)
+}
+
+/// Creates the tray icon; any click toggles the flyout.
+pub fn create<R: Runtime>(app: &AppHandle<R>, icon: Image<'_>) -> tauri::Result<TrayIcon<R>> {
+    app.manage(Moments::default());
+    TrayIconBuilder::with_id(TRAY)
+        .icon(icon)
+        .tooltip("Juice")
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = event {
+                toggle(tray.app_handle());
+            }
+        })
+        .build(app)
+}
+
+/// Shows the flyout, or hides it when it is open.
+pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(w) = app.get_webview_window(FLYOUT) {
+        if w.is_visible().unwrap_or(false) {
+            let _ = w.hide();
+            return;
+        }
+    }
+    let just_hidden = app.state::<Moments>().0.lock().is_ok_and(|m| within(m.1, REOPEN_GUARD));
+    if !just_hidden {
+        show(app);
+    }
+}
+
+/// Opens the flyout above the tray icon, creating its webview on first use.
+pub fn show<R: Runtime>(app: &AppHandle<R>) {
+    match flyout(app) {
+        Ok(w) => {
+            if let Ok(mut m) = app.state::<Moments>().0.lock() {
+                m.0 = Some(Instant::now());
+            }
+            let _ = w.show().and_then(|_| w.set_focus());
+        }
+        Err(e) => eprintln!("juice: flyout failed: {e}"),
+    }
+}
+
+/// The flyout window; built lazily so users who never open it pay no webview memory.
+fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
+    if let Some(w) = app.get_webview_window(FLYOUT) {
+        return Ok(w);
+    }
+    let w = WebviewWindowBuilder::new(app, FLYOUT, WebviewUrl::App("index.html".into()))
+        .title("Juice")
+        .inner_size(WIDTH, 360.0)
+        .decorations(false)
+        .resizable(false)
+        .skip_taskbar(true)
+        .always_on_top(true)
+        .visible(false)
+        .transparent(true)
+        .shadow(true)
+        .effects(WindowEffectsConfig { effects: vec![Effect::Mica], ..Default::default() })
+        .build()?;
+    let handle = app.clone();
+    let win = w.clone();
+    w.on_window_event(move |e| {
+        if let WindowEvent::Focused(false) = e {
+            let moments = handle.state::<Moments>();
+            let Ok(mut m) = moments.0.lock() else { return };
+            if within(m.0, SHOW_GUARD) {
+                let _ = win.set_focus();
+            } else {
+                m.1 = Some(Instant::now());
+                let _ = win.hide();
+            }
+        }
+    });
+    fit_to(app, &w, 360.0)?;
+    Ok(w)
+}
+
+/// Resizes the flyout to `height` CSS pixels and places it over the tray icon.
+pub fn fit_to<R: Runtime>(app: &AppHandle<R>, w: &WebviewWindow<R>, height: f64) -> tauri::Result<()> {
+    let scale = w.scale_factor()?;
+    let (fw, fh) = ((WIDTH * scale).round() as i32, (height * scale).round() as i32);
+    let icon = app.tray_by_id(TRAY).and_then(|t| t.rect().ok().flatten()).map(|r| {
+        let p = r.position.to_physical::<i32>(scale);
+        let s = r.size.to_physical::<i32>(scale);
+        Area { x: p.x, y: p.y, w: s.width, h: s.height }
+    });
+    let monitor = match icon {
+        Some(i) => app.monitor_from_point(f64::from(i.x), f64::from(i.y))?,
+        None => None,
+    }
+    .or(app.primary_monitor()?);
+    let Some(m) = monitor else { return w.set_size(PhysicalSize::new(fw, fh)) };
+    let wa = m.work_area();
+    let work = Area { x: wa.position.x, y: wa.position.y, w: wa.size.width as i32, h: wa.size.height as i32 };
+    // No tray rect (icon hidden in overflow): anchor at the work area's bottom-right corner.
+    let icon = icon.unwrap_or(Area { x: work.x + work.w, y: work.y + work.h, w: 0, h: 0 });
+    let (x, y) = place(icon, fw, fh, work, (GAP * scale).round() as i32);
+    w.set_size(PhysicalSize::new(fw, fh))?;
+    w.set_position(PhysicalPosition::new(x, y))
+}
+
+/// Page reports its content height; resize and re-place the flyout.
+#[tauri::command]
+pub fn fit<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, height: f64) -> Result<(), String> {
+    if !(height.is_finite() && height > 0.0) {
+        return Err(format!("bad height {height}"));
+    }
+    fit_to(&app, &window, height.min(2000.0)).map_err(|e| e.to_string())
+}

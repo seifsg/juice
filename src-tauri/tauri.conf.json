@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Juice",
+  "version": "0.1.0",
+  "identifier": "dev.seif.juice",
+  "build": { "frontendDist": "../ui-dist" },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": { "active": false, "icon": ["icons/icon.png", "icons/icon.ico"] }
+}
