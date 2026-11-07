@@ -44,7 +44,8 @@ fn period(entries: &[Entry]) -> Period {
     models.sort_by(|a, b| b.cost.total_cmp(&a.cost).then(b.tokens.total().cmp(&a.tokens.total())));
     Period {
         tokens: models.iter().map(|m| m.tokens.total()).sum(),
-        cost: models.iter().map(|m| m.cost).sum(),
+        // fold from +0.0: an empty f64 `sum()` is -0.0 and would print "$-0.00".
+        cost: models.iter().fold(0.0, |sum, m| sum + m.cost),
         unpriced: models.iter().any(|m| m.unpriced),
         models,
     }
@@ -91,21 +92,21 @@ pub fn tokens(n: u64) -> String {
     if v < 9.95 { format!("{v:.1}{unit}") } else { format!("{v:.0}{unit}") }
 }
 
-/// Tray tooltip, at most 127 characters (the shell's limit).
+/// Tray tooltip, at most 127 characters (the shell's limit). No app name: the shell already shows it.
 pub fn tooltip(s: &Snapshot) -> String {
     let plus = |p: &Period| if p.unpriced { "+" } else { "" };
     let text = if !s.root_found {
-        format!("Juice · no logs at {}", s.root)
+        format!("No logs at {}", s.root)
     } else {
         let window = match s.window_end.and_then(|e| Local.timestamp_millis_opt(e).single()) {
             Some(end) => format!(
-                "Juice · 5h {}{} · {} tok · resets {}",
+                "5h {}{} · {} tok · resets {}",
                 money(s.window.cost),
                 plus(&s.window),
                 tokens(s.window.tokens),
                 end.format("%H:%M")
             ),
-            None => "Juice · no active 5h window".to_string(),
+            None => "No active 5h window".to_string(),
         };
         format!("{window}\nToday {}{} · {} tok", money(s.today.cost), plus(&s.today), tokens(s.today.tokens))
     };
@@ -145,6 +146,7 @@ mod tests {
         assert_eq!(t.next_wake, t.window_end.unwrap());
         let idle = totals(&entries[..2], now);
         assert_eq!((idle.window_end, idle.window.tokens), (None, 0));
+        assert_eq!(money(period(&[]).cost), "$0.00");
         assert_eq!(idle.next_wake, Local.with_ymd_and_hms(2026, 11, 8, 0, 0, 0).unwrap().timestamp_millis());
     }
 
@@ -159,7 +161,7 @@ mod tests {
             root_found: found,
         };
         let t = tooltip(&snap("C:\\x".into(), true));
-        assert!(t.starts_with("Juice · 5h $3.42+ · 1.2M tok · resets "), "{t}");
+        assert!(t.starts_with("5h $3.42+ · 1.2M tok · resets "), "{t}");
         assert!(t.ends_with("\nToday $123456 · 1000B tok"), "{t}");
         assert_eq!(tooltip(&snap("p".repeat(300), false)).chars().count(), 127);
         let t: Vec<_> = [950, 9_949, 9_960, 999_499, 999_500].map(tokens).into();
