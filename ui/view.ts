@@ -60,15 +60,33 @@ function modelRows(): { node: HTMLElement; set: (p: Period) => void } {
   };
 }
 
+/** A switch that asks `set` for a new state and shows the state it resolves to (reverts on failure). */
+function toggle(label: string, set: (on: boolean) => Promise<boolean>): { node: HTMLElement; input: HTMLInputElement } {
+  const input = el('input');
+  input.type = 'checkbox';
+  input.setAttribute('role', 'switch');
+  const node = el('label', 'switch');
+  node.append(input, el('span', 'track'), el('span', '', label));
+  input.addEventListener('change', () => {
+    const want = input.checked;
+    set(want).then(
+      (on) => (input.checked = on),
+      (e: unknown) => ((input.checked = !want), console.error(`juice: ${label}`, e)),
+    );
+  });
+  return { node, input };
+}
+
 export interface Actions {
   quit: () => void;
-  /** Turns autostart on or off; resolves to the state actually set. */
+  /** Each turns its setting on or off and resolves to the state actually set. */
   autostart: (on: boolean) => Promise<boolean>;
+  badge: (on: boolean) => Promise<boolean>;
 }
 
 export interface View {
   render: (s: Snapshot | null, now: number) => void;
-  setAutostart: (on: boolean) => void;
+  setSwitches: (autostart: boolean, badge: boolean) => void;
   /** Plays the open motion. */
   enter: () => void;
 }
@@ -92,22 +110,14 @@ export function mount(root: HTMLElement, act: Actions): View {
   const warn = el('p', 'note warn');
   const unpriced = el('p', 'note muted', '+ Some models have no published price: their tokens count, their cost is not guessed.');
 
-  const sw = el('input');
-  sw.type = 'checkbox';
-  sw.setAttribute('role', 'switch');
-  const swLabel = el('label', 'switch');
-  swLabel.append(sw, el('span', 'track'), el('span', '', 'Start with Windows'));
-  sw.addEventListener('change', () => {
-    const want = sw.checked;
-    act.autostart(want).then(
-      (on) => (sw.checked = on),
-      (e: unknown) => ((sw.checked = !want), console.error('juice: autostart', e)),
-    );
-  });
+  const startup = toggle('Start with Windows', act.autostart);
+  const taskbar = toggle('Show on taskbar', act.badge);
+  const switches = el('div', 'switches');
+  switches.append(startup.node, taskbar.node);
   const quit = el('button', 'quit', 'Quit');
   quit.addEventListener('click', act.quit);
   const footer = el('footer');
-  footer.append(swLabel, quit);
+  footer.append(switches, quit);
   const fine = el('p', 'fine muted', 'Estimates at API list prices · unofficial, not affiliated with Anthropic');
 
   const hero = el('header', 'hero');
@@ -147,7 +157,10 @@ export function mount(root: HTMLElement, act: Actions): View {
       warn.textContent = s ? `${s.unreadable} log line${s.unreadable === 1 ? '' : 's'} could not be read and ${s.unreadable === 1 ? 'is' : 'are'} not counted.` : '';
       show(unpriced, !!s && (s.today.unpriced || (active && s.window.unpriced)));
     },
-    setAutostart: (on) => void (sw.checked = on),
+    setSwitches(autostart, badge) {
+      startup.input.checked = autostart;
+      taskbar.input.checked = badge;
+    },
     enter() {
       root.classList.remove('enter');
       void root.offsetWidth;

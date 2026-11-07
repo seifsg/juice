@@ -2,12 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod agg;
+mod badge;
 mod commands;
 mod icon;
 mod model;
 mod parse;
 mod place;
 mod price;
+mod settings;
 mod store;
 mod tray;
 mod worker;
@@ -33,10 +35,15 @@ fn main() {
             tray::snapshot,
             commands::autostart,
             commands::set_autostart,
+            commands::badge,
+            commands::set_badge,
             commands::quit
         ])
         .setup(|app| {
             tray::create(app.handle(), icon::tile(0.0, false))?;
+            let handle = app.handle().clone();
+            let on = settings::badge_on(&app.path().app_config_dir()?);
+            badge::init(move || tray::toggle(&handle), on);
             let handle = app.handle().clone();
             let tx = worker::spawn(logs_root(app.path().home_dir())?, move |s| tray::publish(&handle, s));
             app.manage(tx);

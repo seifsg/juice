@@ -49,12 +49,7 @@ pub fn render(text: &str, active: bool, size: u32) -> Vec<u8> {
     let mut px = vec![0u8; (size * size * 4) as usize];
     for y in 0..size {
         for x in 0..size {
-            // Distance into the nearest rounded corner gives antialiased edges.
-            let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
-            let cx = fx.clamp(r, n - r);
-            let cy = fy.clamp(r, n - r);
-            let d = ((fx - cx).powi(2) + (fy - cy).powi(2)).sqrt();
-            let a = (r + 0.5 - d.max(r - 0.5)).clamp(0.0, 1.0);
+            let a = cover((x as f32 + 0.5, y as f32 + 0.5), (0.0, 0.0, n, n), r);
             let i = ((y * size + x) * 4) as usize;
             px[i..i + 3].copy_from_slice(&bg);
             px[i + 3] = (a * 255.0) as u8;
@@ -62,6 +57,15 @@ pub fn render(text: &str, active: bool, size: u32) -> Vec<u8> {
     }
     draw_text(&mut px, size, text);
     px
+}
+
+/// How much of the pixel centered at `p` a rounded rectangle `(x0, y0, x1, y1)` with corner radius `r` covers (0..1).
+/// The distance into the nearest corner gives antialiased edges; `r` = half the side draws a circle.
+pub fn cover((fx, fy): (f32, f32), (x0, y0, x1, y1): (f32, f32, f32, f32), r: f32) -> f32 {
+    let cx = fx.clamp(x0 + r, x1 - r);
+    let cy = fy.clamp(y0 + r, y1 - r);
+    let d = ((fx - cx).powi(2) + (fy - cy).powi(2)).sqrt();
+    (r + 0.5 - d.max(r - 0.5)).clamp(0.0, 1.0)
 }
 
 /// Paints `text` centered in whole-pixel cells: never wider than tall, at most one pixel taller than wide.

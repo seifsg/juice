@@ -2,7 +2,7 @@
 use crate::model::Snapshot;
 use crate::place::{place, Area};
 use crate::worker::Msg;
-use crate::{agg, icon};
+use crate::{agg, badge, icon};
 use std::sync::mpsc::Sender;
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -83,6 +83,10 @@ pub fn publish<R: Runtime>(app: &AppHandle<R>, snap: Snapshot) {
         if let Err(e) = shown {
             eprintln!("juice: tray update failed: {e}");
         }
+    }
+    let lines = badge::lines(&snap);
+    if let Err(e) = app.run_on_main_thread(move || badge::update(lines)) {
+        eprintln!("juice: badge update failed: {e}");
     }
     if let Err(e) = app.emit_to(FLYOUT, "snapshot", &snap) {
         eprintln!("juice: flyout update failed: {e}");

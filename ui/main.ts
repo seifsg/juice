@@ -10,6 +10,7 @@ if (!root) throw new Error('juice: #app missing');
 const view = mount(root, {
   quit: () => void invoke('quit'),
   autostart: (on) => invoke<boolean>('set_autostart', { on }),
+  badge: (on) => invoke<boolean>('set_badge', { on }),
 });
 let last: Snapshot | null = null;
 const show = (s: Snapshot | null): void => {
@@ -24,7 +25,7 @@ new ResizeObserver(() => {
 
 await listen<Snapshot>('snapshot', (e) => show(e.payload));
 show(await invoke<Snapshot | null>('snapshot'));
-view.setAutostart(await invoke<boolean>('autostart'));
+view.setSwitches(await invoke<boolean>('autostart'), await invoke<boolean>('badge'));
 view.enter();
 
 // Countdown and time bar move on their own, only while the flyout is visible.

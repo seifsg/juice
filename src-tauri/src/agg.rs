@@ -80,6 +80,11 @@ pub fn money(usd: f64) -> String {
     if usd < 99.995 { format!("${usd:.2}") } else { format!("${usd:.0}") }
 }
 
+/// A period's cost; "+" marks a lower bound (some usage had no price).
+pub fn spent(p: &Period) -> String {
+    format!("{}{}", money(p.cost), if p.unpriced { "+" } else { "" })
+}
+
 /// "950", "1.2k", "340k", "1.2M", "34M", "1.2B". Units switch where rounding would print "1000k" or "10.0k".
 pub fn tokens(n: u64) -> String {
     let f = n as f64;
@@ -94,21 +99,19 @@ pub fn tokens(n: u64) -> String {
 
 /// Tray tooltip, at most 127 characters (the shell's limit). No app name: the shell already shows it.
 pub fn tooltip(s: &Snapshot) -> String {
-    let plus = |p: &Period| if p.unpriced { "+" } else { "" };
     let text = if !s.root_found {
         format!("No logs at {}", s.root)
     } else {
         let window = match s.window_end.and_then(|e| Local.timestamp_millis_opt(e).single()) {
             Some(end) => format!(
-                "5h {}{} · {} tok · resets {}",
-                money(s.window.cost),
-                plus(&s.window),
+                "5h {} · {} tok · resets {}",
+                spent(&s.window),
                 tokens(s.window.tokens),
                 end.format("%H:%M")
             ),
             None => "No active 5h window".to_string(),
         };
-        format!("{window}\nToday {}{} · {} tok", money(s.today.cost), plus(&s.today), tokens(s.today.tokens))
+        format!("{window}\nToday {} · {} tok", spent(&s.today), tokens(s.today.tokens))
     };
     text.chars().take(127).collect()
 }
