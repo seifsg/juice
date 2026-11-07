@@ -2,7 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod icon;
+mod model;
+mod parse;
 mod place;
+mod price;
 mod tray;
 
 fn main() {
