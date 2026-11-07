@@ -28,6 +28,7 @@ body {
   font: 14px/20px 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   user-select: none;
   cursor: default;
+  overflow: hidden;
 }
 [hidden] { display: none !important; }
 main { padding: 16px; }
@@ -53,7 +54,7 @@ main { padding: 16px; }
   letter-spacing: -0.5px;
 }
 .big.idle { color: var(--muted); font-size: 28px; line-height: 40px; }
-.sub { margin-top: 2px; }
+.sub { margin-top: 2px; overflow-wrap: anywhere; }
 .remain { margin-top: 6px; font-size: 12px; line-height: 16px; }
 
 .bar { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
