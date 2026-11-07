@@ -13,6 +13,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "custom-protocol"] }
 serde = { version = "1", features = ["derive"] }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }
+
 [profile.release]
 lto = true
 codegen-units = 1
