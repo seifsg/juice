@@ -121,7 +121,9 @@ pub fn show<R: Runtime>(app: &AppHandle<R>) {
                 m.0 = Some(Instant::now());
             }
             tick(app);
-            let _ = w.show().and_then(|_| w.set_focus());
+            if let Err(e) = w.show().and_then(|()| w.set_focus()) {
+                eprintln!("juice: flyout show failed: {e}");
+            }
         }
         Err(e) => eprintln!("juice: flyout failed: {e}"),
     }
@@ -161,12 +163,17 @@ fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
     let win = w.clone();
     w.on_window_event(move |e| {
         if let WindowEvent::Focused(false) = e {
-            let moments = handle.state::<Moments>();
-            let Ok(mut m) = moments.0.lock() else { return };
-            if within(m.0, SHOW_GUARD) {
+            // Decide under the lock, act after it: focus and hide calls can raise window events again.
+            let reclaim = handle.state::<Moments>().0.lock().is_ok_and(|mut m| {
+                let reclaim = within(m.0, SHOW_GUARD);
+                if !reclaim {
+                    m.1 = Some(Instant::now());
+                }
+                reclaim
+            });
+            if reclaim {
                 let _ = win.set_focus();
             } else {
-                m.1 = Some(Instant::now());
                 hide(&handle, &win);
             }
         }

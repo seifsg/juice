@@ -40,7 +40,7 @@ fn main() {
             commands::quit
         ])
         .setup(|app| {
-            tray::create(app.handle(), icon::tile(0.0, false))?;
+            tray::create(app.handle(), icon::loading())?;
             let handle = app.handle().clone();
             let on = settings::badge_on(&app.path().app_config_dir()?);
             badge::init(move || tray::toggle(&handle), on);

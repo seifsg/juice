@@ -3,7 +3,7 @@ import { left, model, money, tokens } from './format.ts';
 import type { ModelRow, Period, Snapshot } from './types.ts';
 
 const BLOCK_MS = 5 * 3_600_000;
-const clock = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const clock = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
 /** Element with a class and plain text. */
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {

@@ -135,7 +135,7 @@ fn compose(px: &mut [u8], size: SIZE, st: &Style, caption_top: i32, (pad, dot): 
     let plate = (0.0, inset, w, h - inset);
     let (dx, dy) = (pad as f32, (h - dot as f32) / 2.0);
     let dot_box = (dx, dy, dx + dot as f32, dy + dot as f32);
-    for (i, p) in px.chunks_exact_mut(4).enumerate() {
+    for (i, p) in px.as_chunks_mut::<4>().0.iter_mut().enumerate() {
         let (x, y) = ((i as i32 % size.cx) as f32 + 0.5, (i as i32 / size.cx) as f32 + 0.5);
         let coverage = f32::from(p[0].max(p[1]).max(p[2])) / 255.0;
         // Alpha 1/255 everywhere: invisible, but clicks between letters still land on the badge.

@@ -41,6 +41,12 @@ pub fn tile(cost: f64, active: bool) -> Image<'static> {
     Image::new_owned(render(&label(cost), active, size), size, size)
 }
 
+/// Grey tile without a number, shown until the first scan finishes (".0" would claim a zero spend).
+pub fn loading() -> Image<'static> {
+    let size = tray_size();
+    Image::new_owned(render("", false, size), size, size)
+}
+
 /// RGBA pixels of a `size`×`size` tile showing `text`; grey when no 5h window is active.
 pub fn render(text: &str, active: bool, size: u32) -> Vec<u8> {
     let bg = if active { ORANGE } else { GREY };

@@ -9,8 +9,9 @@ use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-/// Entries older than this are dropped: enough for today plus a 5h window that started yesterday.
-const HORIZON: i64 = 24 * 3_600_000;
+/// Entries older than this are dropped: enough for today (25 h on a DST fall-back day) plus a 5h window
+/// that started yesterday.
+const HORIZON: i64 = 26 * 3_600_000;
 
 /// Deduplicated entries and the counters that come with them.
 #[derive(Default)]
@@ -205,7 +206,7 @@ mod tests {
         assert_eq!(s.snapshot(now).0.window.tokens, 110, "m1 counted once across files");
         // The writer finishes the partial line.
         let mut f = fs::OpenOptions::new().append(true).open(&a).unwrap();
-        f.write_all(line("m2", &ts)[20..].as_bytes()).unwrap();
+        f.write_all(&line("m2", &ts).as_bytes()[20..]).unwrap();
         s.touch(vec![a.clone()], now);
         assert_eq!(s.snapshot(now).0.window.tokens, 220);
         // Replaced by a shorter file: reread from the start, old keys still dedupe.

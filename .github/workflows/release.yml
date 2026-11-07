@@ -26,9 +26,11 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build:ui
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
-      - run: cargo build --release --manifest-path src-tauri/Cargo.toml
-      - name: Attach juice.exe to the release
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml
+      - name: Checksum
+        run: (Get-FileHash src-tauri/target/release/juice.exe -Algorithm SHA256).Hash.ToLower() + '  juice.exe' | Set-Content -NoNewline juice.exe.sha256
+      - name: Attach juice.exe and its checksum to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$env:GITHUB_REF_NAME" src-tauri/target/release/juice.exe --title "Juice $env:GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$env:GITHUB_REF_NAME" src-tauri/target/release/juice.exe juice.exe.sha256 --title "Juice $env:GITHUB_REF_NAME" --generate-notes

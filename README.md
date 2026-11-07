@@ -23,7 +23,7 @@ Running it twice just opens the flyout of the copy already running.
 - Each response is counted once, even though the logs repeat it.
 - The 5-hour window follows the common rule: it starts at its first response rounded down to the hour and lasts 5 hours. The next response after that opens a new one. "Today" starts at local midnight.
 - The taskbar text sits on the main taskbar only, left of the tray. If it ever covers an app button, turn off **Show on taskbar**.
-- Juice looks back 24 hours. If you used Claude Code with no 5-hour break for longer than that, its window can start at a different hour than your plan's real one.
+- Juice looks back about a day (26 hours). If you used Claude Code with no 5-hour break for longer than that, its window can start at a different hour than your plan's real one.
 
 ## Costs are estimates
 

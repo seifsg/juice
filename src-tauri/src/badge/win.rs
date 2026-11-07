@@ -115,7 +115,10 @@ fn attach() {
 
 /// Removes the badge and its hook.
 fn detach() {
-    let (badge, hook) = with(|s| (std::mem::replace(&mut s.badge, null_mut()), std::mem::replace(&mut s.hook, null_mut())));
+    let (badge, hook) = with(|s| {
+        s.hover = false;
+        (std::mem::replace(&mut s.badge, null_mut()), std::mem::replace(&mut s.hook, null_mut()))
+    });
     // SAFETY: both were created by `attach`; null handles are skipped, a dead badge just fails.
     unsafe {
         if !hook.is_null() {
@@ -150,6 +153,9 @@ fn paint() {
     let (badge, taskbar, notify, hover, lines) = with(|s| (s.badge, s.taskbar, s.notify, s.hover, s.lines.clone()));
     let Some(lines) = lines.filter(|_| !badge.is_null()) else { return };
     let (bar, tray) = (rect(taskbar), rect(notify));
+    if bar.right - bar.left < bar.bottom - bar.top {
+        return; // Vertical taskbar (Windows 10): no room for text; the tray icon still shows the number.
+    }
     // SAFETY: reads the taskbar's DPI; 0 for a stale handle falls back to 96.
     let scale = match unsafe { GetDpiForWindow(taskbar) } {
         0 => 1.0,
