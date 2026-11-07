@@ -8,10 +8,12 @@ import { mount } from './view.ts';
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('juice: #app missing');
 
+/** Counts switch flips, so a system read that started before a flip cannot undo it. */
+let flips = 0;
 const view = mount(root, {
   quit: () => void invoke('quit'),
-  autostart: (on) => invoke<boolean>('set_autostart', { on }),
-  badge: (on) => invoke<boolean>('set_badge', { on }),
+  autostart: (on) => (flips++, invoke<boolean>('set_autostart', { on })),
+  badge: (on) => (flips++, invoke<boolean>('set_badge', { on })),
 });
 let last: Snapshot | null = null;
 const show = (s: Snapshot | null): void => {
@@ -19,9 +21,12 @@ const show = (s: Snapshot | null): void => {
   view.render(s, Date.now());
 };
 
-/** Reads both switches from the system, so a change made elsewhere (Task Manager) shows on every open. */
+/** Reads both switches from the system, so a change made elsewhere (Task Manager) shows on every open.
+ * A flip during the read wins: its own result sets the switch. */
 const syncSwitches = async (): Promise<void> => {
-  view.setSwitches(await invoke<boolean>('autostart'), await invoke<boolean>('badge'));
+  const before = flips;
+  const [autostart, badge] = await Promise.all([invoke<boolean>('autostart'), invoke<boolean>('badge')]);
+  if (flips === before) view.setSwitches(autostart, badge);
 };
 
 // The window hugs its content; the core places it over the tray icon.
