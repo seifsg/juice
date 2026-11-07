@@ -1,7 +1,7 @@
-//! Wall-clock times in the user's own Windows short-time format ("5:00 PM" or "17:00"), so they match the taskbar clock.
+//! Wall-clock times in the user's Windows time format without seconds ("5:00 PM" or "17:00"), like the taskbar clock.
 use chrono::{DateTime, Datelike, Local, Timelike};
 
-/// `t` as hours and minutes, the way the taskbar clock writes them.
+/// `t` as hours and minutes in the user's locale.
 pub fn clock(t: DateTime<Local>) -> String {
     #[cfg(windows)]
     if let Some(s) = system(t) {

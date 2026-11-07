@@ -165,7 +165,9 @@ fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
     let w = if mica() {
         builder.transparent(true).effects(WindowEffectsConfig { effects: vec![Effect::Mica], ..Default::default() })
     } else {
-        builder.initialization_script("document.documentElement.classList.add('solid')")
+        builder.initialization_script(
+            "document.addEventListener('DOMContentLoaded', () => document.documentElement.classList.add('solid'))",
+        )
     }
     .build()?;
     let handle = app.clone();

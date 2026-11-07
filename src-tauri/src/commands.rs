@@ -48,6 +48,12 @@ pub fn set_badge<R: Runtime>(app: AppHandle<R>, on: bool) -> Result<bool, String
     Ok(on)
 }
 
+/// The flyout reports its own errors here, so they land in juice.log with the rest.
+#[tauri::command]
+pub fn log(message: String) {
+    crate::log::warn(format_args!("flyout: {message}"));
+}
+
 /// Quits Juice: tray icon, badge and flyout.
 #[tauri::command]
 pub fn quit<R: Runtime>(app: AppHandle<R>) {

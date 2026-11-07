@@ -1,6 +1,7 @@
 /** Flyout entry: wires the core's snapshots and commands to the view, and sizes the window to its content. */
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { report } from './parts.ts';
 import type { Snapshot } from './types.ts';
 import { mount } from './view.ts';
 
@@ -25,11 +26,11 @@ const syncSwitches = async (): Promise<void> => {
 
 // The window hugs its content; the core places it over the tray icon.
 new ResizeObserver(() => {
-  invoke('fit', { height: Math.ceil(root.getBoundingClientRect().height) }).catch((e: unknown) => console.error('juice: fit', e));
+  invoke('fit', { height: Math.ceil(root.getBoundingClientRect().height) }).catch((e: unknown) => report('fit', e));
 }).observe(root);
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') invoke('close').catch((err: unknown) => console.error('juice: close', err));
+  if (e.key === 'Escape') invoke('close').catch((err: unknown) => report('close', err));
 });
 
 try {
@@ -39,7 +40,7 @@ try {
   if (!last) show(first);
   await syncSwitches();
 } catch (e) {
-  console.error('juice: start', e);
+  report('start', e);
   show(last);
 }
 view.enter();
@@ -50,5 +51,5 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   view.render(last, Date.now());
   view.enter();
-  syncSwitches().catch((e: unknown) => console.error('juice: switches', e));
+  syncSwitches().catch((e: unknown) => report('switches', e));
 });

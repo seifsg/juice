@@ -1,6 +1,13 @@
 /** Flyout building blocks. Log data only ever lands in textContent, never in HTML. */
+import { invoke } from '@tauri-apps/api/core';
 import { model, money, tokens } from './format.ts';
 import type { ModelRow, Period } from './types.ts';
+
+/** Logs a flyout error to juice.log (release builds have no console) and to the console. */
+export function report(where: string, e: unknown): void {
+  console.error(`juice: ${where}`, e);
+  invoke('log', { message: `${where}: ${String(e)}` }).catch(() => undefined);
+}
 
 /** Element with a class and plain text. */
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -81,7 +88,7 @@ export function toggle(label: string, set: (on: boolean) => Promise<boolean>): {
       (on) => (input.checked = on),
       (e: unknown) => {
         input.checked = !want;
-        console.error(`juice: ${label}`, e);
+        report(label, e);
       },
     );
   });

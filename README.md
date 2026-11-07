@@ -2,7 +2,7 @@
 
 A Windows taskbar meter that shows the tokens and estimated cost of your Claude Code sessions, for the current 5-hour window and today.
 
-![Juice on the taskbar: $9.57, 5h · resets 17:00](site/taskbar.png)
+![Juice on the taskbar: $11.05, 5h · resets 5:00 PM](site/taskbar.png)
 
 ![Juice flyout over the Windows tray](site/flyout.png)
 

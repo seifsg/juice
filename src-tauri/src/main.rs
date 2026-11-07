@@ -41,6 +41,7 @@ fn main() {
             commands::set_autostart,
             commands::badge,
             commands::set_badge,
+            commands::log,
             commands::quit,
             tray::close
         ])
