@@ -1,1 +1,6 @@
 .factory/
+node_modules/
+dist/
+ui-dist/
+src-tauri/target/
+src-tauri/gen/
