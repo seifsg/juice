@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Juice · tray meter for Claude Code usage</title>
+    <meta name="description" content="See the tokens and estimated cost of your Claude Code sessions in the Windows tray. Local only, unofficial." />
+    <link rel="icon" href="./juice.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <img class="logo" src="./juice.svg" alt="" width="72" height="72" />
+        <h1>Juice</h1>
+        <p class="lede">See what your Claude Code sessions burn, right on the Windows taskbar: tokens and estimated cost for the current 5-hour window and today.</p>
+        <div class="cta">
+          <a class="button primary" id="download" href="https://github.com/seifsg/juice/releases/latest/download/juice.exe">Download for Windows</a>
+          <a class="button" href="https://github.com/seifsg/juice">Source on GitHub</a>
+        </div>
+        <p class="meta" id="platform">Windows 10 and 11 · x64 · one small exe, no installer</p>
+      </header>
+
+      <figure class="shot bar">
+        <img src="./taskbar.png" alt="Juice on the Windows taskbar next to the tray: an orange dot, $8.96, and the caption 5h · resets 17:00" width="440" height="48" />
+        <figcaption>Always on the taskbar, like the weather: the 5-hour window's cost and when it resets.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <img src="./flyout.png" alt="Juice flyout above the Windows tray: 5-hour window cost, tokens, reset time and per-model bars, then today's totals" width="340" height="591" />
+        <figcaption>Click it for the breakdown per model. The tray icon shows the same number.</figcaption>
+      </figure>
+
+      <section class="facts">
+        <div>
+          <h2>Local only</h2>
+          <p>Reads Claude Code's own session logs in <code>~/.claude/projects</code>. No network, no account, no API key.</p>
+        </div>
+        <div>
+          <h2>Live, not polled</h2>
+          <p>Watches the log folder and updates within a second or two of each response. Idle, it sleeps.</p>
+        </div>
+        <div>
+          <h2>Light</h2>
+          <p>A Rust core of about 15 MB. The flyout's webview loads when you open it and is freed a minute after you close it.</p>
+        </div>
+      </section>
+
+      <footer>
+        <p>Unofficial. Not affiliated with or endorsed by Anthropic. Costs are estimates at public API list prices; plan limits and real billing may differ.</p>
+        <p>🏭 Built with <a href="https://softwarefactory.company/">AI Software Factory</a> by Seif</p>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
