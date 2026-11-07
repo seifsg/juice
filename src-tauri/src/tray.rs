@@ -25,6 +25,9 @@ const GAP: f64 = 12.0;
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
 /// The shell's overflow panel takes focus back as it closes; a blur this soon after showing is not the user leaving.
 const SHOW_GUARD: Duration = Duration::from_millis(600);
+/// Hidden this long, the flyout's webview is closed to hand back its memory (about 165 MB across WebView2's
+/// processes); the next open rebuilds it in about 0.4 s.
+const RELEASE_AFTER: Duration = Duration::from_secs(60);
 
 /// When the flyout was last shown and last hidden on blur.
 #[derive(Default)]
@@ -96,7 +99,7 @@ pub fn snapshot(latest: State<'_, Latest>) -> Option<Snapshot> {
 pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
     if let Some(w) = app.get_webview_window(FLYOUT) {
         if w.is_visible().unwrap_or(false) {
-            let _ = w.hide();
+            hide(app, &w);
             return;
         }
     }
@@ -120,7 +123,20 @@ pub fn show<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// The flyout window; built lazily so users who never open it pay no webview memory.
+/// Hides the flyout, then frees its webview unless it is shown again within `RELEASE_AFTER`.
+fn hide<R: Runtime>(app: &AppHandle<R>, w: &WebviewWindow<R>) {
+    let _ = w.hide();
+    let (app, w) = (app.clone(), w.clone());
+    std::thread::spawn(move || {
+        std::thread::sleep(RELEASE_AFTER);
+        let shown_since = app.state::<Moments>().0.lock().is_ok_and(|m| within(m.0, RELEASE_AFTER));
+        if !shown_since && !w.is_visible().unwrap_or(true) {
+            let _ = w.destroy();
+        }
+    });
+}
+
+/// The flyout window; built on open so users who never open it pay no webview memory.
 fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
     if let Some(w) = app.get_webview_window(FLYOUT) {
         return Ok(w);
@@ -147,7 +163,7 @@ fn flyout<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
                 let _ = win.set_focus();
             } else {
                 m.1 = Some(Instant::now());
-                let _ = win.hide();
+                hide(&handle, &win);
             }
         }
     });
